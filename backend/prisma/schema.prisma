@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(OWNER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  socialAccounts SocialAccount[]
+  conversations  Conversation[]  @relation("UserConversations")
+}
+
+model SocialAccount {
+  id           String   @id @default(uuid())
+  platform     String   // instagram, facebook, tiktok, whatsapp, x
+  platformId   String   // ID from the platform
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  metadata     Json?    // Store extra platform-specific info
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([platform, platformId])
+}
+
+model Conversation {
+  id          String    @id @default(uuid())
+  platform    String
+  externalId  String    // Thread ID from platform
+  customerName String?
+  lastMessage String?
+  lastMessageAt DateTime
+  isRead      Boolean   @default(false)
+  status      String    @default("OPEN") // OPEN, CLOSED, ARCHIVED
+
+  messages    Message[]
+  
+  assigneeId  String?
+  assignee    User?     @relation("UserConversations", fields: [assigneeId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([platform, externalId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  externalId     String?  // Message ID from platform
+  content        String
+  senderId       String   // Could be platform user ID or system user ID
+  isFromCustomer Boolean
+  attachments    Json?    // Array of URLs/types
+  
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  createdAt      DateTime @default(now())
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  platform    String
+  externalId  String
+  status      String
+  totalAmount Float
+  currency    String
+  customerName String?
+  items       Json     // Array of order items
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([platform, externalId])
+}
